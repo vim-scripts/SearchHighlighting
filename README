@@ -29,17 +29,20 @@ SEE ALSO
 RELATED WORKS
 I came up with this on my own; however, the idea can be traced back to
 francoissteinmetz and da.thompson in the comments of vimtip #1 (now at
-http://vim.wikia.com/wiki/VimTip1): >
+http://vim.wikia.com/wiki/VimTip1):
     map <silent> <F10> :set invhls<CR>:let @/="<C-r><C-w>"<CR>
 
 - highlight_word_under_cursor.vim (vimscript #4287) implements the search
   auto-highlighting of the whole and optionally current word.
 - HiCursorWords (vimscript #4306) highlights the word under the cursor, with
   optional delay and limited to certain syntax groups.
+- Matchmaker (https://github.com/qstrahl/vim-matchmaker) highlights the word
+  under the cursor with matchadd(), not the current search pattern.
 - star search (vimscript #4335) changes the behavior of * to not jump to the
   next match, and includes the visual search from the next plugin
-- https://github.com/bronson/vim-visual-star-search can do searching of the
+- https://github.com/bronson/vim-visual-star-search provides searching of the
   visual selection
+- visualstar.vim (vimscript #2944) provides searching of the visual selection
 
 USAGE
 *                       Toggle search highlighting for the current whole
@@ -47,10 +50,31 @@ USAGE
 g*                      Toggle search highlighting for the current word
                         on/off.
 {Visual}*               Toggle search highlighting for the selection on/off.
+                        For a blockwise-visual selection, not just lines
+                        that match the block's lines on their own are matched,
+                        but all occurrences that contain the block's text,
+                        though not just with the same vertical alignment (that
+                        isn't possible to assert with Vim's regular
+                        expressions), and only the first line's match is
+                        highlighted. For example, a match on
+                            foo
+                            bar
+                        will also match all three occurrences in
+                            foo    my foo is        tell foo
+                            bar    inside bar               bar
+                        but not a single
+                            foo
 
 [count]*                Search forward for the [count]'th occurrence of the
 [count]g*               word nearest to the cursor.
 {Visual}[count]*
+
+[count],*               Search forward for the [count]'th occurrence of the
+                        word under the cursor, keeping the cursor at the
+                        current position within the word's matches (via
+                        search-offset).
+                        Observes the new non-jumping behavior of the star
+                        commands without a [count].
 
 <Leader>*               Toggle auto-search highlighting (using the last
                         {what}; default is "wword").

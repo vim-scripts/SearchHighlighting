@@ -2,17 +2,36 @@
 "
 " DEPENDENCIES:
 "   - Requires Vim 7.0 or higher.
-"   - ingointegration.vim autoload script
-"   - ingosearch.vim autoload script
+"   - ingo/avoidprompt.vim autoload script
+"   - ingo/err.vim autoload script
+"   - ingo/regexp.vim autoload script
+"   - ingo/selection.vim autoload script
 "   - SearchHighlighting.vim autoload script
-"   - EchoWithoutScrolling.vim (optional)
 "
-" Copyright: (C) 2008-2012 Ingo Karkat
+" Copyright: (C) 2008-2013 Ingo Karkat
 "   The VIM LICENSE applies to this script; see ':help copyright'.
 "
 " Maintainer:	Ingo Karkat <ingo@karkat.de>
 "
 " REVISION	DATE		REMARKS
+"   1.20.026	07-Aug-2013	ENH: Add ,* search that keeps the current
+"				position within the current word when jumping to
+"				subsequent matches.
+"				Correctly emulate * behavior on whitespace-only
+"				lines where there's no cword: Issue "E348: No
+"				string under cursor".
+"   1.11.025	07-Jun-2013	Move EchoWithoutScrolling.vim into ingo-library.
+"   1.11.024	24-May-2013	Move ingointegration#GetVisualSelection() into
+"				ingo-library.
+"			    	Move ingosearch.vim to ingo-library.
+"   1.10.023	19-Jan-2013	BUG: For {Visual}*, a [count] isn't considered.
+"				The problem is that getting the visual selection
+"				clobbers v:count. Instead of evaluating v:count
+"				only inside
+"				SearchHighlighting#SearchHighlightingNoJump(),
+"				pass it into the function as an argument before
+"				the selected text, so that it gets evaluated
+"				before the normal mode command clears the count.
 "   1.01.022	03-Dec-2012	FIX: Prevent repeated error message when
 "				an invalid {what} was given to
 "				:SearchAutoHighlighting.
@@ -118,16 +137,10 @@ endif
 
 "- integration ----------------------------------------------------------------
 
-" Use EchoWithoutScrolling#Echo to emulate the built-in truncation of the search
-" pattern (via ':set shortmess+=T').
-silent! call EchoWithoutScrolling#MaxLength()	" Execute a function to force autoload.
-if exists('*EchoWithoutScrolling#Echo')
-    cnoremap <SID>EchoSearchPatternForward  call EchoWithoutScrolling#Echo(EchoWithoutScrolling#TranslateLineBreaks('/'.@/))
-    cnoremap <SID>EchoSearchPatternBackward call EchoWithoutScrolling#Echo(EchoWithoutScrolling#TranslateLineBreaks('?'.@/))
-else " fallback
-    cnoremap <SID>EchoSearchPatternForward  echo '/'.@/
-    cnoremap <SID>EchoSearchPatternBackward echo '?'.@/
-endif
+" Use ingo#avoidprompt#EchoAsSingleLine() to emulate the built-in truncation of
+" the search pattern (via ':set shortmess+=T').
+cnoremap <SID>EchoSearchPatternForward  call ingo#avoidprompt#EchoAsSingleLine('/'.@/)
+cnoremap <SID>EchoSearchPatternBackward call ingo#avoidprompt#EchoAsSingleLine('?'.@/)
 
 
 
@@ -159,13 +172,13 @@ if g:SearchHighlighting_NoJump
     " [count]'th occurence.
     " <cword> selects the (key)word under or after the cursor, just like the star command.
     " If highlighting is turned on, the search pattern is echoed, just like the star command does.
-    nnoremap <script> <silent> <Plug>SearchHighlightingStar  :<C-U>if SearchHighlighting#SearchHighlightingNoJump( '*',expand('<cword>'),1)<Bar>if &hlsearch<Bar>set hlsearch<Bar>endif<Bar><SID>EchoSearchPatternForward<Bar>else<Bar>nohlsearch<Bar>endif<CR>
-    nnoremap <script> <silent> <Plug>SearchHighlightingGStar :<C-U>if SearchHighlighting#SearchHighlightingNoJump('g*',expand('<cword>'),0)<Bar>if &hlsearch<Bar>set hlsearch<Bar>endif<Bar><SID>EchoSearchPatternForward<Bar>else<Bar>nohlsearch<Bar>endif<CR>
+    nnoremap <script> <silent> <Plug>SearchHighlightingStar  :<C-U>if SearchHighlighting#SearchHighlightingNoJump( '*', v:count, expand('<cword>'), 1)<Bar>if &hlsearch<Bar>set hlsearch<Bar>endif<Bar><SID>EchoSearchPatternForward<Bar>else<Bar>if ingo#err#IsSet()<Bar>echoerr ingo#err#Get()<Bar>else<Bar>nohlsearch<Bar>endif<Bar>endif<CR>
+    nnoremap <script> <silent> <Plug>SearchHighlightingGStar :<C-U>if SearchHighlighting#SearchHighlightingNoJump('g*', v:count, expand('<cword>'), 0)<Bar>if &hlsearch<Bar>set hlsearch<Bar>endif<Bar><SID>EchoSearchPatternForward<Bar>else<Bar>if ingo#err#IsSet()<Bar>echoerr ingo#err#Get()<Bar>else<Bar>nohlsearch<Bar>endif<Bar>endif<CR>
 
     " Highlight selected text in visual mode as search pattern, but do not jump to
     " next match.
     " gV avoids automatic re-selection of the Visual area in select mode.
-    vnoremap <script> <silent> <Plug>SearchHighlightingStar :<C-U>if SearchHighlighting#SearchHighlightingNoJump('gv*', ingointegration#GetVisualSelection(), 0)<Bar>if &hlsearch<Bar>set hlsearch<Bar>endif<Bar><SID>EchoSearchPatternForward<Bar>else<Bar>nohlsearch<Bar>endif<CR>gV
+    vnoremap <script> <silent> <Plug>SearchHighlightingStar :<C-U>if SearchHighlighting#SearchHighlightingNoJump('gv*', v:count, ingo#selection#Get(), 0)<Bar>if &hlsearch<Bar>set hlsearch<Bar>endif<Bar><SID>EchoSearchPatternForward<Bar>else<Bar>nohlsearch<Bar>endif<CR>gV
 
     if ! hasmapto('<Plug>SearchHighlightingStar', 'n')
 	nmap * <Plug>SearchHighlightingStar
@@ -197,12 +210,20 @@ if g:SearchHighlighting_ExtendStandardCommands
     " Search for selected text in visual mode.
     nnoremap <expr> <SID>(SearchForwardWithCount)  (v:count ? v:count : '') . '/'
     nnoremap <expr> <SID>(SearchBackwardWithCount) (v:count ? v:count : '') . '?'
-    vnoremap <script> <silent> <Plug>SearchHighlightingExtendedStar :<C-U>call SearchHighlighting#AutoSearchOff()<CR><SID>(SearchForwardWithCount)<C-R><C-R>=ingosearch#LiteralTextToSearchPattern(ingointegration#GetVisualSelection(), 0, '/')<CR><CR>:<SID>EchoSearchPatternForward<CR>gV
-    vnoremap <script> <silent> <Plug>SearchHighlightingExtendedHash :<C-U>call SearchHighlighting#AutoSearchOff()<CR><SID>(SearchBackwardWithCount)<C-R><C-R>=ingosearch#LiteralTextToSearchPattern(ingointegration#GetVisualSelection(), 0, '?')<CR><CR>:<SID>EchoSearchPatternBackward<CR>gV
+    vnoremap <script> <silent> <Plug>SearchHighlightingExtendedStar :<C-U>call SearchHighlighting#AutoSearchOff()<CR><SID>(SearchForwardWithCount)<C-R><C-R>=ingo#regexp#FromLiteralText(ingo#selection#Get(), 0, '/')<CR><CR>:<SID>EchoSearchPatternForward<CR>gV
+    vnoremap <script> <silent> <Plug>SearchHighlightingExtendedHash :<C-U>call SearchHighlighting#AutoSearchOff()<CR><SID>(SearchBackwardWithCount)<C-R><C-R>=ingo#regexp#FromLiteralText(ingo#selection#Get(), 0, '?')<CR><CR>:<SID>EchoSearchPatternBackward<CR>gV
     xmap * <Plug>SearchHighlightingExtendedStar
     xmap # <Plug>SearchHighlightingExtendedHash
 endif
 
+
+
+"- mappings Search Current Position --------------------------------------------
+
+nnoremap <script> <silent> <Plug>SearchHighlightingCStar :<C-U>execute SearchHighlighting#SearchHighlightingNoJump('c*', v:count, expand('<cword>'), 1)<Bar>call SearchHighlighting#OffsetPostCommand()<Bar>if &hlsearch<Bar>set hlsearch<Bar>endif<CR>
+if ! hasmapto('<Plug>SearchHighlightingCStar', 'n')
+    nmap ,* <Plug>SearchHighlightingCStar
+endif
 
 
 "- mappings Auto Search Highlighting ------------------------------------------
@@ -211,6 +232,7 @@ nnoremap <silent> <Plug>SearchHighlightingAutoSearch :if SearchHighlighting#Togg
 if ! hasmapto('<Plug>SearchHighlightingAutoSearch', 'n')
     nmap <silent> <Leader>* :if SearchHighlighting#ToggleAutoSearch()<Bar>if &hlsearch<Bar>set hlsearch<Bar>endif<Bar>else<Bar>nohlsearch<Bar>endif<CR>
 endif
+
 
 "- commands Auto Search Highlighting ------------------------------------------
 
