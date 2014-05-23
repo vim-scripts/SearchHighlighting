@@ -25,6 +25,12 @@ SEE ALSO
   colors simultaneously.
 - SearchAlternatives.vim (vimscript #4146) can add and subtract search
   alternatives via mappings and commands.
+- To also show the number of matches when selecting a word (*, g* etc.),
+  you can append the corresponding command to the <Plug> mapping (see
+  SearchHighlighting-remap):
+    nmap <silent> * <Plug>SearchHighlightingStar:%s///gn<CR>
+ The SearchPosition.vim plugin (vimscript #2634) provides an extended
+  version of that command.
 
 RELATED WORKS
 I came up with this on my own; however, the idea can be traced back to
