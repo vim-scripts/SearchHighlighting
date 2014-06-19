@@ -55,6 +55,7 @@ USAGE
                         \<word\> on/off.
 g*                      Toggle search highlighting for the current word
                         on/off.
+
 {Visual}*               Toggle search highlighting for the selection on/off.
                         For a blockwise-visual selection, not just lines
                         that match the block's lines on their own are matched,
@@ -84,6 +85,10 @@ g*                      Toggle search highlighting for the current word
 
 <Leader>*               Toggle auto-search highlighting (using the last
                         {what}; default is "wword").
+{Visual}<Leader>*       Toggle auto-search highlighting; when turning on, a
+                        {what} value of "selection" is used (but the preset
+                        isn't changed; the original value is used for a later
+                        non-visual mode auto-search).
 
 :SearchAutoHighlighting [{what}]
                         Turn on automatic highlighting of occurrences of
@@ -96,6 +101,8 @@ g*                      Toggle search highlighting for the current word
                         line:  current text in line, excluding indent and
                                trailing whitespace
                         exactline: exact current line
+                        selection: only highlight selected text, in normal
+                                   mode, nothing is selected
 
 :NoSearchAutoHighlighting
                         Turn off automatic highlighting.
